@@ -1,9 +1,9 @@
 {
   "name": "video-downloader",
-  "version": "1.1.2",
+  "version": "1.2.0",
   "private": true,
-  "description": "视频下载器 —— 同时支持 B站 与 抖音 的视频下载工具（Electron + 原生前端，零构建链）",
-  "author": "Rewritten",
+  "description": "微光视频下载器 —— 同时支持 B站 与 抖音 的视频下载工具（Electron + 原生前端，零构建链）",
+  "author": "微光照前行",
   "license": "MIT",
   "main": "src/main/main.js",
   "scripts": {

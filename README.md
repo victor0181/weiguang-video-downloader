@@ -1,11 +1,11 @@
-# 视频下载器
+# 微光视频下载器
 
-一款同时支持 **B站** 与 **抖音** 的视频下载工具（界面里的名字就叫「视频下载器」）。
+一款同时支持 **B站** 与 **抖音** 的视频下载工具（界面里的名字就叫「微光视频下载器」）。
 零构建链、依赖极少、源码即程序。
 
-> 早期版本叫 BiliDown-Next、只支持 B站；加入抖音后改成了通用的名字「视频下载器」，
-> 图标也从字母 B 换成了通用的「下载」符号。项目文件夹、上级目录、用户数据目录也一并改名，
-> **老配置会自动迁移、不会丢**（见下方「关于改名」）。
+> 命名沿革：**BiliDown-Next**（只支持 B站）→ **视频下载器**（加入抖音后改的通用名）→
+> **微光视频下载器**（2026-10-13 定名，取自开发者笔名「微光照前行」）。图标也从字母 B 换成了
+> 通用的「下载」符号。**老配置会自动迁移、不会丢**（见下方「关于改名」）。
 
 ![首页](docs/screenshot-home.png)
 
@@ -125,6 +125,8 @@ VideoDownloader/           （原名 BiliDown-New，2026-10-10 改名）
 ├─ bin/                    aria2c.exe + ffmpeg.exe + aria2c.conf
 ├─ assets/logo.ico         图标（由 tools/make-icon.js 代码生成，非第三方素材）
 ├─ docs/                   界面截图
+├─ data/                   ★ 程序数据（设置 / 下载记录 / 登录态 / 缓存）—— 运行时自动生成，不入库
+├─ logs/                   运行日志 app.log —— 运行时自动生成，不入库
 ├─ src/
 │  ├─ main/                主进程
 │  │  ├─ main.js           窗口 / 托盘 / IPC / aria2 生命周期 / 启动体检 / 应用名
@@ -148,37 +150,62 @@ VideoDownloader/           （原名 BiliDown-New，2026-10-10 改名）
 └─ 自检.bat                一键跑完下面 4 项自检（本机无需装 Node.js）
 ```
 
-### 关于改名（BiliDown-Next → 视频下载器）
+### 关于改名（BiliDown-Next → 视频下载器 → 微光视频下载器）
 
-程序早期只支持 B站，叫 **BiliDown-Next**；加入抖音后成了通用下载器，于是把所有
-"带 B站 / BiliDown 字样的名字"统一换掉。改的是**名字**，不是功能：
+程序早期只支持 B站，叫 **BiliDown-Next**；加入抖音后成了通用下载器，改名 **视频下载器**；
+2026-10-13 定名 **微光视频下载器**（取自开发者笔名「微光照前行」）。改的一直是**名字**，不是功能：
 
 | | 旧名 | 现名 |
 |---|---|---|
-| 界面展示名 | BiliDown-Next | **视频下载器**（窗口标题 / 托盘 / 标题栏 / 关于页 / exe 名） |
+| 界面展示名 | BiliDown-Next → 视频下载器 | **微光视频下载器**（窗口标题 / 托盘 / 标题栏 / 关于页 / exe 名） |
 | 项目文件夹 | `BiliDown-New` | `VideoDownloader` |
 | 上级目录 | `B站下载` | `视频下载` |
-| 用户数据目录 | `%APPDATA%\bilidown-next` | `%APPDATA%\video-downloader` |
+| 用户数据目录 | `%APPDATA%\bilidown-next` → `%APPDATA%\video-downloader` | 程序同级 `data\`（见下节） |
+
+> **改名不动数据目录**：展示名改成「微光视频下载器」后，数据目录仍是程序同级的 `data\`
+> （常量 `DATA_DIR_NAME` 写死、不跟随展示名），登录态、设置、下载记录一个字都不会丢。
 
 > 注意：源码注释与文档里仍有「B站」二字，那是**平台名**（B站 依然是支持的平台），
 > 不是应用名，不要顺手替换成「下载」。同理，README 里提到的 `Bilidown` 指的是
 > **上游原版项目**，也不是本程序。
 
-**★ 用户数据目录改名 + 一次性迁移**（2026-10-10）
+**★ 数据搬家：`%APPDATA%` → 程序同级目录**（2026-10-13）
 
-设置、下载记录、**B站 登录态**都存在用户数据目录里。直接换目录 = 老用户丢配置 +
-得重新扫码登录，所以 `src/main/main.js` 里加了 `migrateLegacyUserData()`：
+程序现在走**绿色便携**路线：设置、下载记录、登录态、缓存、日志**全部在程序自己的文件夹里**，
+不再往 `%APPDATA%` 写。整个文件夹拷到别的机器或 U 盘就能接着用。
 
-- 启动时若**新目录不存在或为空**、而旧目录 `%APPDATA%\bilidown-next` 还在，
-  就把旧目录**整份搬过来**（逐条目 `renameSync`，跨盘/被占用时退回「递归复制 + 删源」）；
-- 搬空后删掉旧目录；**新目录里已有数据就绝不覆盖**；单个条目搬不动就跳过，
-  绝不影响启动（整体 `try/catch` 兜底）。
+| 数据 | 位置 |
+|---|---|
+| 设置 / 下载记录 / B站与抖音 登录态 / Chromium 缓存 | `<程序目录>\data\` |
+| 运行日志 | `<程序目录>\logs\app.log` |
 
-`DATA_DIR_NAME` 现在与 `package.json` 的 `name` 同名（都是 `video-downloader`），
-因此 Electron 预建的「默认 userData 目录」**就是**真正要用的那个 ——
-以前那种"每次启动凭空多出一个空文件夹"的现象自然消失。回收逻辑仍保留，以防将来再改名。
+选址逻辑在 `src/main/main.js`：
 
-名字常量集中在 `src/main/main.js` 顶部的 `APP_NAME` / `DATA_DIR_NAME` / `LEGACY_DATA_DIR_NAME`；
+- `getProgramDir()` 统一给出基准目录 —— 打包态 = exe 所在目录，开发态 = 项目根。
+  **日志与数据共用它**，不会再出现"日志在 A、数据在 B"这种分裂；
+- 首选 `<程序目录>\data`，**程序目录不可写**（装在 Program Files、只读介质、U 盘写保护）
+  才回退 `%APPDATA%`，保证受限环境下依然能启动；
+- 设了 `BD_USERDATA` 则以它为准 —— 调试时用它把数据隔离到别处，别拿真实数据当试验田。
+
+**★ 一次性迁移**（老用户升级不会丢数据）
+
+历史上数据在 `%APPDATA%` 下，先后用过两个名字。启动时按「新 → 旧」顺序搬进 `data\`：
+
+1. `%APPDATA%\video-downloader`（1.x 版本）
+2. `%APPDATA%\bilidown-next`（更早，只支持 B站 那会儿）
+
+`migrateDataDir(oldDir, newDir)` 的安全守则：
+
+- 只在**新目录不存在或为空**时才动手 —— 新目录已有数据就绝不覆盖
+  （所以第二份源目录会在这一步自动跳过，天然实现"取最新那份"）；
+- 逐条目 `renameSync`（同盘瞬间完成），跨盘/被占用时退回「递归复制 + 删源」；
+- 单个条目搬不动就跳过，**绝不影响启动**（整体 `try/catch` 兜底）；
+- 搬空后删掉旧目录；有残留就原样留着，交给用户判断。
+
+搬完后，Electron 启动时按 `package.json` 的 name 预建的那个空壳目录
+（`%APPDATA%\video-downloader`）会被自动收掉 —— 守卫从严，**只删确实是空的**那个。
+
+名字常量集中在 `src/main/main.js` 顶部的 `APP_NAME` / `DATA_DIR_NAME` / `LEGACY_DATA_DIR_NAMES`；
 图标字形则有两处必须同款：`tools/make-icon.js` 的 `glyphMarkup()` 与
 `src/renderer/index.html` 里的内联 SVG（`--logo-1/2/3` 也在 `app.css` 的 `:root`）。
 
@@ -233,7 +260,7 @@ node_modules/electron/dist/electron.exe tools/make-icon.js
 |---|---|
 | `BD_SCREENSHOT=<路径>` | 界面渲染完成后截图并退出。**设了它即进入"自动化模式"：不建托盘、不抢单实例锁、窗口 skipTaskbar + 不抢焦点**，跑在你屏幕上完全无感 |
 | `BD_SHOT_JS=<脚本>` | 截图前执行的注入脚本（用于切页等）；以 `@` 开头表示从文件读取，便于写长脚本。仓库里有两个现成的：`tools/_shot-about.js`（切到关于页）、`tools/_shot-douyin.js`（跑一遍真实抖音解析） |
-| `BD_USERDATA=<目录>` | 重定向用户数据目录（便携模式 / 隔离测试） |
+| `BD_USERDATA=<目录>` | 重定向数据目录 —— 把数据隔离到别处，不碰程序目录下的 `data\`（调试首选） |
 | `BD_API_OVERRIDE=<文件>` | 指定接口覆盖文件（便于测试"接口变更"场景） |
 | `BD_NO_HEALTH` | 设任意值即跳过启动时的接口体检 |
 | `BD_WINDOWS_DEBUG` | 打印被拦下的"想开新窗口"地址，排查乱弹窗时用 |
@@ -451,7 +478,7 @@ node_modules/electron/dist/electron.exe tools/selftest.js   # 再确认端到端
 **靛紫→蓝→青 渐变圆角方块 + 白色「下载」符号（下箭头 + 托盘）**，
 和界面里的 `.tb-logo` / `.about-logo` 是同一套渲染引擎画出来的（Electron/Chromium），所以风格完全一致。
 
-> 早期版本用过「蓝色方块 + 字母 B」的图标；改名成「视频下载器」后换掉了字母 B ——
+> 早期版本用过「蓝色方块 + 字母 B」的图标；改名成「视频下载器」（后定名「微光视频下载器」）后换掉了字母 B ——
 > 字母只能代表一个平台，而通用符号在任何尺寸下都读得懂。`assets/` 里保留的旧版备份是
 > `logo-previous.ico`（更早的蓝色渐变下载箭头版）。
 
@@ -510,15 +537,17 @@ node_modules/electron/dist/electron.exe tools/make-icon.js
 
 | 路径 | 说明 |
 | --- | --- |
-| `dist\视频下载器\` | 绿色版文件夹，约 434 MB，双击 `视频下载器.exe` 直接跑 |
-| `dist\视频下载器-v1.1.0-portable-x64.zip` | 打包好的分享包，约 182 MB |
+| `dist\微光视频下载器\` | 绿色版文件夹，约 450 MB，双击 `微光视频下载器.exe` 直接跑 |
+| `dist\微光视频下载器-v1.2.0-portable-x64.zip` | 打包好的分享包，约 190 MB |
 
 ### 目录布局（**`bin/` 放哪里是硬约束**）
 
 ```
-视频下载器\
-  视频下载器.exe              ← 由 electron.exe 改名而来，并换上应用图标
+微光视频下载器\
+  微光视频下载器.exe          ← 由 electron.exe 改名而来，并换上应用图标
   *.dll / *.pak / locales\    ← Electron 运行时
+  data\                       ← ★ 程序数据：设置 / 下载记录 / 登录态 / 缓存（首次运行自动生成）
+  logs\                       ← 运行日志 app.log（首次运行自动生成）
   resources\
     app\                      ← 代码：package.json  src\  assets\  docs\  tools\  node_modules\
     bin\                      ← aria2c.exe + ffmpeg.exe + aria2c.conf
@@ -551,7 +580,7 @@ node_modules/electron/dist/electron.exe tools/make-icon.js
 
 ### ★ exe 图标：为什么改名没用
 
-把 `electron.exe` 改名成 `视频下载器.exe` **不会**改掉资源管理器里显示的图标 —— 那个图标烧在 PE 的
+把 `electron.exe` 改名成 `微光视频下载器.exe` **不会**改掉资源管理器里显示的图标 —— 那个图标烧在 PE 的
 资源段里，Electron 给自己留的是它自家的默认图标。`assets/logo.ico` 只管**运行时**的窗口图标和托盘图标
 （`main.js` 把它传给 `BrowserWindow` / `Tray`），跟文件图标是两码事。
 
@@ -564,7 +593,7 @@ node_modules/electron/dist/electron.exe tools/make-icon.js
 - 原位改写零新增空间、文件大小一字节不变，且完全可复现。代价是图标档位受 exe 原有槽位数量限制
   （Electron 给 4 个），脚本按 Windows 外壳真正会请求的 **256 / 48 / 32 / 16** 来填 ——
   这正好是完整可用的那一组，其余尺寸系统会缩放。
-- 校验：`node tools/_verify-icon.js dist/视频下载器/视频下载器.exe assets/logo.ico tools/out/exe-icon-256.png`
+- 校验：`node tools/_verify-icon.js dist/微光视频下载器/微光视频下载器.exe assets/logo.ico tools/out/exe-icon-256.png`
   —— 把 exe 里的图标抠出来跟 `logo.ico` **逐字节比对**，并把 256 那张导成 png 供肉眼看。
 - 换完之后如果资源管理器还显示旧图标，是 **Windows 图标缓存**的问题，重启 explorer 或把文件夹换个位置即可。
 
@@ -574,7 +603,7 @@ node_modules/electron/dist/electron.exe tools/make-icon.js
 （发布归档为了可复现构建做的归一化，1980 也是 ZIP / DOS 时间的下限），而 Windows 的 `CopyFile`
 会把这个时间一并复制过来，所以打包产物里 Electron 那部分都显示 1980。
 
-程序自己的文件（`resources/app/...`）保持真实修改时间；只有新写出来的 `视频下载器.exe`
+程序自己的文件（`resources/app/...`）保持真实修改时间；只有新写出来的 `微光视频下载器.exe`
 （改过图标）和 `使用说明.txt` 是打包时刻。**只影响观感，不影响任何功能。**
 
 想让整包时间统一成打包时刻：
@@ -589,7 +618,7 @@ node_modules/electron/dist/electron.exe tools/make-icon.js
 set BD_USERDATA=%CD%\tools\_pkgprof
 set BD_SCREENSHOT=%CD%\tools\out\pkg-home.png
 set BD_SHOT_JS=@%CD%\tools\_shot-pkg.js
-dist\视频下载器\视频下载器.exe
+dist\微光视频下载器\微光视频下载器.exe
 ```
 
 预期输出里应有 `[aria2] RPC ready on 127.0.0.1:xxxxx`（证明内置 aria2c 起得来）
@@ -602,8 +631,13 @@ dist\视频下载器\视频下载器.exe
 
 ### 分发给别人要注意
 
-- 用户数据目录是 `%APPDATA%\video-downloader`（**不是**包名），换机器/换用户各存一份设置与登录态。
-  老版本用过的 `%APPDATA%\bilidown-next` 会在首次运行时自动迁移过去。
+- 数据**全在程序自己的文件夹里**：`data\`（设置 / 下载记录 / 登录态）与 `logs\`（日志）。
+  换机器连整个文件夹一起拷即可，设置与登录态都跟着走 —— 不用再去 `%APPDATA%` 找。
+  老版本留在 `%APPDATA%\video-downloader`（或更早的 `bilidown-next`）里的数据，
+  会在首次运行时自动搬进 `data\`。
+- 若程序被放在 `C:\Program Files` 这类**不可写**目录，数据会自动回退到
+  `%APPDATA%\video-downloader`（此时"拷走文件夹就带走数据"不再成立）——
+  绿色版建议解压到 D 盘等可写位置。
 - 程序**没有代码签名**，首次运行会弹「Windows 已保护你的电脑」→ 需要点「更多信息 → 仍要运行」。
   包里的 `使用说明.txt` 已写明这一点。
 - 只把 exe 挑出来发没用，`resources\` 必须跟着一起走。

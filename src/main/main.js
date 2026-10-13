@@ -52,25 +52,30 @@ const BUILD_INFO = (() => {
 })();
 
 /**
- * 应用展示名。原名 BiliDown-Next，现为通用名「视频下载器」（同时支持 B站 与 抖音）。
- * 改这里时记得同步另外两处：package.json 的 name、src/renderer/index.html 的
- * <title> 与标题栏文字。
+ * 应用展示名。沿革：BiliDown-Next → 视频下载器 →「微光视频下载器」
+ * （2026-10-13 定名，取自开发者笔名「微光照前行」）。同时支持 B站 与 抖音。
+ * 改这里时记得同步另外两处：package.json 的 description、
+ * src/renderer/index.html 的 <title> 与标题栏文字。
+ * ★ 打包脚本（tools/build-portable.js）会读这行来决定 exe 与输出文件夹的名字。
  */
-const APP_NAME = '视频下载器';
+const APP_NAME = '微光视频下载器';
 
 /**
- * 用户数据目录名（即 %APPDATA%\<这个名字>）——设置 / 下载记录 / B站 登录态都在里面。
+ * 程序数据目录名 —— **程序同级目录下的 `data\`**。
  *
- * ★ 为什么取这个名字：
- *   1. 与 package.json 的 name 保持一致 → Electron 预先建好的「默认 userData 目录」
- *      和真正要用的目录是同一个，不会再凭空多出一个空壳目录（见下方回收逻辑）。
- *   2. 纯 ASCII，避免中文路径在转交给 aria2 / ffmpeg 子进程时踩编码坑。
+ * ★ 设计原则：数据跟着程序走（绿色 / 便携）。
+ *   设置、下载记录、B站 与 抖音 登录态、Chromium 缓存全都落在程序自己的文件夹里，
+ *   整个文件夹拷到别的机器或 U 盘就能接着用，不用再去 %APPDATA% 里翻。
+ *   只有在程序目录**不可写**时（装在 Program Files、只读介质、U 盘写保护）才回退 %APPDATA%。
  *
- * ★ 它曾经叫 bilidown-next（只支持 B站 那会儿留下的老名字）。直接换名 = 换目录 =
- *   老用户丢配置 + 得重新扫码登录，所以下面有一段**一次性迁移**把旧目录整份搬过来。
+ * ★ 历史上数据放在 %APPDATA% 下，先后用过两个名字（见 LEGACY_DATA_DIR_NAMES）。
+ *   从老版本升级上来时，下面有一段**一次性迁移**把旧目录整份搬进 data\，
+ *   设置与登录态都不会丢。
  */
-const DATA_DIR_NAME = 'video-downloader';
-const LEGACY_DATA_DIR_NAME = 'bilidown-next';
+const DATA_DIR_NAME = 'data';
+
+/** 老版本数据在 %APPDATA% 里用过的目录名（按「新 → 旧」排列），迁移时依次尝试。 */
+const LEGACY_DATA_DIR_NAMES = ['video-downloader', 'bilidown-next'];
 
 app.setName(APP_NAME);
 let defaultUserDataDir = '';
@@ -78,38 +83,70 @@ try {
   const appData = app.getPath('appData');
 
   // Electron 在本文件被执行之前，就会按 package.json 的 name 先把「默认 userData 目录」
-  // 建出来。以前 userData 指向的是另一个名字（bilidown-next），那个默认目录就变成了
-  // **每次启动都凭空多出来的空文件夹**，用户看到会很困惑。
-  // 现在 DATA_DIR_NAME 与 package.json 的 name 同名，两者是同一个目录，这段回收逻辑
-  // 实际上不会触发 —— 保留它是为了将来万一有人把 DATA_DIR_NAME 改成别的名字。
+  // （%APPDATA%\<name>）建出来。那是我们**已经不再使用**的位置，于是它变成了每次启动
+  // 都凭空多出来的空文件夹 —— 下面「空壳回收」那段会把它收掉（只删确实是空的）。
   try {
     defaultUserDataDir = path.join(appData, require('../../package.json').name || '');
   } catch (e) {
     defaultUserDataDir = '';
   }
 
-  const userDataDir = path.join(appData, DATA_DIR_NAME);
+  const programDataDir = path.join(getProgramDir(), DATA_DIR_NAME);
 
-  // ★ 一次性迁移：老版本的目录叫 bilidown-next。换名不能顺手丢数据 ——
-  //   设置、下载记录、B站 登录态全在里面，丢了就得重新扫码登录。
-  try {
-    migrateLegacyUserData(appData, DATA_DIR_NAME, LEGACY_DATA_DIR_NAME, userDataDir);
-  } catch (e) {
-    console.error('[app] legacy userData migration skipped: ' + e.message);
+  // ★ 一次性迁移：老版本的数据留在 %APPDATA% 下（video-downloader / bilidown-next）。
+  //   换位置不能顺手丢数据 —— 设置、下载记录、登录态全在里面，丢了得重新扫码登录。
+  //   按「新 → 旧」顺序试：第一份搬完 data\ 就非空了，后面的自动跳过（见 migrateDataDir）。
+  for (const legacy of LEGACY_DATA_DIR_NAMES) {
+    try {
+      migrateDataDir(path.join(appData, legacy), programDataDir);
+    } catch (e) {
+      console.error('[app] migrate ' + legacy + ' skipped: ' + e.message);
+    }
   }
-
-  // 必须在 app ready 之前设置，否则 Chromium 已经按新名字建好缓存目录了
-  app.setPath('userData', userDataDir);
 } catch (e) {
-  console.error('[app] failed to pin userData path: ' + e.message);
+  console.error('[app] data migration failed: ' + e.message);
 }
+
+/**
+ * 确定用户数据目录（**必须在 app ready 之前**完成）。
+ *
+ * ★ 选址原则：数据跟着程序走。首选 `<程序目录>\data\`；程序目录不可写
+ *   （装在 Program Files、只读介质、U 盘写保护）才回退 %APPDATA%。
+ *   设了 BD_USERDATA 则以它为准 —— 调试时用它把数据隔离到别处，别拿真实数据当试验田。
+ *
+ * 探测方式：往候选目录真写一个文件再删掉，写得进才算数。
+ */
+(function resolveUserDataDir() {
+  const defaultDir = app.getPath('userData');
+  const candidates = process.env.BD_USERDATA
+    ? [process.env.BD_USERDATA]
+    : [path.join(getProgramDir(), DATA_DIR_NAME), defaultDir];
+
+  for (const dir of candidates) {
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+      const probe = path.join(dir, '.write-probe');
+      fs.writeFileSync(probe, 'ok');
+      fs.unlinkSync(probe);
+      if (dir !== defaultDir) {
+        app.setPath('userData', dir);
+        app.setPath('cache', path.join(dir, 'Cache'));
+        console.log('[config] user data dir: ' + dir);
+      }
+      return;
+    } catch (e) {
+      console.warn('[config] dir not writable, trying next: ' + dir + ' (' + e.message + ')');
+    }
+  }
+  console.error('[config] no writable user-data dir; settings may not persist.');
+})();
 
 // 日志落盘的 init 放在下面 userData 定好之后（见 resolveLogBaseDir()）：
 // 日志优先写在**程序同级目录**，只有那儿不可写才回退 userData，回退分支要用到最终的
 // userData 路径，所以不能在这儿提前 init。
 
 /**
- * 一次性迁移旧版用户数据目录（bilidown-next → video-downloader）。
+ * 搬迁数据目录（老位置 → 新位置）。用于把 %APPDATA% 里的旧数据搬进程序目录。
  *
  * ★ 安全守则（宁可少迁，也不能搞坏）：
  *   1. 只在「新目录不存在、或确实是个空目录」时才动手 —— 新目录已有数据就绝不覆盖；
@@ -118,16 +155,14 @@ try {
  *      才退回「递归复制 + 删源」。
  *   3. 单个条目搬不动就跳过它，**不能因为一个文件让整次迁移失败、更不能影响启动**。
  *   4. 旧目录搬空后删掉；里面还有搬运失败的残留就原样留着，交给用户自己判断。
+ *   5. 调用方按「新 → 旧」顺序逐个调用即可：第一份搬完后新目录已非空，
+ *      后面的调用会在守则 1 处自动跳过。
  *
- * @param {string} appData  %APPDATA%
- * @param {string} newName  新目录名
- * @param {string} oldName  旧目录名
- * @param {string} newDir   新目录完整路径
+ * @param {string} oldDir  源目录（老位置，只读）
+ * @param {string} newDir  目标目录（新位置，写入）
  */
-function migrateLegacyUserData(appData, newName, oldName, newDir) {
-  if (!oldName || oldName === newName) return;
-
-  const oldDir = path.join(appData, oldName);
+function migrateDataDir(oldDir, newDir) {
+  if (!oldDir || oldDir === newDir) return;
   if (!fs.existsSync(oldDir)) return;
 
   if (fs.existsSync(newDir)) {
@@ -159,7 +194,7 @@ function migrateLegacyUserData(appData, newName, oldName, newDir) {
     if (fs.readdirSync(oldDir).length === 0) fs.rmdirSync(oldDir);
   } catch (e) { /* 被占用就留着 */ }
 
-  console.log('[app] migrated ' + moved + ' item(s): ' + oldName + ' -> ' + newName);
+  console.log('[app] migrated ' + moved + ' item(s): ' + oldDir + ' -> ' + newDir);
 }
 
 /** 手写递归复制。**不用 fs.cpSync**：在某些沙箱环境里它会静默杀掉进程（无异常、exit 127）。 */
@@ -174,9 +209,10 @@ function copyTree(src, dest) {
   }
 }
 
-// 收掉上面说的空壳目录。★ 守卫从严：**只删确实是空的、且不是当前生效的那个**。
-// 只要里面有任何东西（哪怕是用户自己放的），一律保留不动。
-// 现在 DATA_DIR_NAME 与 package.json 的 name 同名，两个路径相同 → 这段自然不会执行。
+// 收掉 Electron 预建的「默认 userData 目录」空壳（%APPDATA%\<package.json name>）。
+// ★ 守卫从严：**只删确实是空的、且不是当前生效的那个**。只要里面有任何东西
+// （哪怕是用户自己放的、或迁移时没搬动的残留），一律保留不动。
+// 数据现在住在程序目录下，所以这个壳在迁移成功后就是空的，正常情况会被收掉。
 if (defaultUserDataDir && defaultUserDataDir !== app.getPath('userData')) {
   try {
     if (fs.existsSync(defaultUserDataDir) && fs.readdirSync(defaultUserDataDir).length === 0) {
@@ -255,56 +291,30 @@ function isWritableDir(dir) {
 }
 
 /**
+ * 程序所在目录 —— **数据与日志的选址基准**。
+ *   打包态：exe 所在目录（如 `D:\微光视频下载器\`）
+ *   开发态：项目根目录（源码直接跑时没有"exe 同级目录"这一说）
+ */
+function getProgramDir() {
+  try {
+    if (app.isPackaged) return path.dirname(process.execPath);
+  } catch (_) { /* 取不到就按开发态处理 */ }
+  return path.join(__dirname, '..', '..');
+}
+
+/**
  * 日志落在哪儿 —— **跟着程序走，不往 C 盘塞**。
- *   1. 打包后：<exe 同级目录>\logs\app.log —— 绿色版/便携版就一个文件夹，日志一眼能找到，
+ *   1. `<程序目录>\logs\app.log` —— 绿色版/便携版就一个文件夹，日志一眼能找到，
  *      用户「把日志发回来」只需在程序目录里找，不用去 %APPDATA% 翻。
- *   2. 开发态（源码直接跑）：项目根目录\logs\app.log（没有"exe 同级目录"这一说）。
- *   3. 上面那个目录不可写（例如整个程序装在 Program Files、只读介质、U 盘写保护）→
+ *   2. 上面那个目录不可写（例如整个程序装在 Program Files、只读介质、U 盘写保护）→
  *      回退到 userData，保证任何环境下都还有日志，绝不因目录不可写而丢日志。
  */
 function resolveLogBaseDir() {
-  let preferred = '';
-  try {
-    preferred = app.isPackaged ? path.dirname(process.execPath) : path.join(__dirname, '..', '..');
-  } catch (_) {
-    preferred = '';
-  }
+  const preferred = getProgramDir();
   if (preferred && isWritableDir(preferred)) return preferred;
   console.warn('[log] program dir not writable, falling back to userData');
   return app.getPath('userData');
 }
-
-/**
- * 确定用户数据目录（须在 app ready 之前完成）。
- * 优先用系统默认位置；若因权限等原因不可写，则自动回退到程序目录下的 data/，
- * 保证在受限环境下依然能启动。
- */
-(function resolveUserDataDir() {
-  const defaultDir = app.getPath('userData');
-  const candidates = process.env.BD_USERDATA
-    ? [process.env.BD_USERDATA]
-    : [defaultDir, path.join(__dirname, '..', '..', 'data')];
-
-  for (const dir of candidates) {
-    try {
-      fs.mkdirSync(dir, { recursive: true });
-      const probe = path.join(dir, '.write-probe');
-      fs.writeFileSync(probe, 'ok');
-      fs.unlinkSync(probe);
-      if (dir !== defaultDir) {
-        app.setPath('userData', dir);
-        app.setPath('cache', path.join(dir, 'Cache'));
-        // userData 换地方了，日志不用跟着走 —— 日志现在落在「程序同级目录」，
-        // 与 userData 无关（只有程序目录不可写的回退分支才用 userData，见 resolveLogBaseDir）。
-        console.log('[config] user data dir switched to: ' + dir);
-      }
-      return;
-    } catch (e) {
-      console.warn('[config] dir not writable, trying next: ' + dir + ' (' + e.message + ')');
-    }
-  }
-  console.error('[config] no writable user-data dir; settings may not persist.');
-})();
 
 // 日志落盘（<程序同级目录>/logs/app.log）——出问题时用户把这个文件发回来即可定位。
 // 放在 userData 定好之后；任何失败都不影响启动。

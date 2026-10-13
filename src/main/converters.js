@@ -194,7 +194,7 @@ function danmakuXmlToAss(xml, opt = {}) {
 
   const header = [
     '[Script Info]',
-    'Title: 视频下载器 弹幕',
+    'Title: 微光视频下载器 弹幕',
     'ScriptType: v4.00+',
     'Collisions: Normal',
     'PlayResX: ' + W,

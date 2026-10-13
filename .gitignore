@@ -5,6 +5,7 @@ tools/_selftest_out/
 tools/_dy_out/
 tools/_dyprof/
 tools/_bilitest_prof/
+tools/_nodetest_prof/
 _tmpud/
 docs/*.tmp
 tools/out/
@@ -18,3 +19,6 @@ bin/*.dll
 # 运行日志与工作区数据
 logs/
 .workbuddy/
+
+# 程序自身数据（开发态跑源码时落在项目根，见 src/main/main.js 的 DATA_DIR_NAME）
+data/

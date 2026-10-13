@@ -121,14 +121,14 @@ function readAppName() {
 
 function readDataDirName() {
   // Same single source of truth: src/main/main.js -> const DATA_DIR_NAME = '...'
-  // Kept in sync automatically so the usage notes never advertise a stale
-  // %APPDATA% folder after the data directory gets renamed again.
+  // ★ 注意：这是**程序同级目录**下的数据文件夹名（不再是 %APPDATA% 里的名字）。
+  // 自动同步，免得数据搬到别处之后使用说明里还写着旧路径。
   try {
     const src = fs.readFileSync(path.join(ROOT, 'src', 'main', 'main.js'), 'utf8');
     const m = src.match(/^const DATA_DIR_NAME\s*=\s*['"]([^'"]+)['"]/m);
     if (m && m[1]) return m[1];
   } catch (e) { /* fall through */ }
-  return 'video-downloader';
+  return 'data';
 }
 
 function readVersion() {
@@ -507,16 +507,21 @@ function main() {
     '     原因：本程序没有购买代码签名证书，这是 Windows 对无签名程序的常规提示，不是病毒。',
     '',
     '二、注意事项',
-    '  · 不要只把 ' + exeName + ' 单独拷走：resources 文件夹必须和它放在一起。',
-    '  · 配置目录：%APPDATA%\\' + dataDirName + '（设置 / 下载记录 / B站登录态都在里面）。',
-    '  · 用过老版本（界面还叫 BiliDown-Next 那会儿）的话，首次运行会自动把旧配置目录',
-    '    整份搬过来，设置与登录态都不会丢，无需手动处理。',
-    '  · 卸载：直接删掉整个文件夹；想连配置一起清掉，再删 %APPDATA%\\' + dataDirName + '。',
+    '  · 不要只把 ' + exeName + ' 单独拷走：resources 与 ' + dataDirName + ' 文件夹都得和它在一起。',
+    '  · 数据全部在程序自己的文件夹里（绿色便携，不往系统盘塞）：',
+    '      ' + dataDirName + '\\   设置、下载记录、B站/抖音 登录态、缓存全在里面；',
+    '      logs\\   运行日志 app.log，反馈问题时把它发回来即可。',
+    '  · 想换台电脑或在 U 盘里用：连整个文件夹一起拷过去就行，设置和登录态都跟着走。',
+    '  · 用过老版本（数据还在 %APPDATA% 里那会儿）的话，首次运行会自动把旧数据',
+    '    整份搬进 ' + dataDirName + '\\，设置与登录态都不会丢，无需手动处理。',
+    '  · 卸载：直接删掉整个文件夹即可，不留任何残余（数据就在里面，一并清掉了）。',
     '  · 未登录 B站 时最高只能下 480P（B站 的限制，且接口会"谎报"更高画质）；',
     '    用「扫码登录」后会按账号权限给到更高清晰度。',
     '',
     '三、目录说明',
     '  ' + exeName + '                主程序',
+    '  ' + dataDirName + '\\' + ' '.repeat(Math.max(1, 24 - dataDirName.length)) + '全部程序数据（设置 / 下载记录 / 登录态 / 缓存）',
+    '  logs\\                        运行日志 app.log',
     '  resources\\app\\               程序代码（src / assets / docs / tools / node_modules）',
     '  resources\\bin\\               内置 aria2c.exe 与 ffmpeg.exe（下载与混流靠它们）',
     '  resources\\app\\tools\\         自检脚本，可在此目录命令行里运行',

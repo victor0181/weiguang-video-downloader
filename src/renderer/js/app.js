@@ -1,7 +1,7 @@
 'use strict';
 
 /* ==========================================================================
-   视频下载器 · 渲染进程
+   微光视频下载器 · 渲染进程
    ========================================================================== */
 
 const $ = (s, r = document) => r.querySelector(s);
@@ -1398,7 +1398,7 @@ function buildHealthReport(h) {
   const when = h && h.checkedAt ? new Date(h.checkedAt).toLocaleString('zh-CN') : '未知时间';
   const line = (f) => `  - ${f.name || '?'} [${f.key || '?'}]：${f.detail || '(无详情)'}`;
   return [
-    '=== 视频下载器 接口体检诊断 ===',
+    '=== 微光视频下载器 接口体检诊断 ===',
     `程序版本：v${state.version || '?'}   构建：${b.builtAt || b.stamp || '开发版'}`,
     `检测时间：${when}   结论：${(h && h.kind) || '无'}`,
     '疑似失效环节：',

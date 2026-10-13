@@ -143,7 +143,7 @@ function buildTemplate() {
     JSON.stringify(
       {
         _comment:
-          '视频下载器 接口覆盖文件。只写你要改的字段即可，未列出的字段会自动沿用程序内置默认值（将来升级程序时也会跟着更新）。改完重启程序生效。',
+          '微光视频下载器 接口覆盖文件。只写你要改的字段即可，未列出的字段会自动沿用程序内置默认值（将来升级程序时也会跟着更新）。改完重启程序生效。',
         urls: Object.assign({}, DEFAULT.urls),
         headers: Object.assign({}, DEFAULT.headers),
         shortLinkRegex: DEFAULT.shortLinkRegex,
@@ -217,7 +217,7 @@ function buildReport(total) {
   }
 
   const L = [];
-  L.push('# 视频下载器 · 接口体检报告');
+  L.push('# 微光视频下载器 · 接口体检报告');
   L.push('');
   L.push(`- 生成时间：${new Date().toLocaleString('zh-CN')}`);
   L.push(`- 程序版本：${ver}`);
@@ -346,7 +346,7 @@ function writeReport(total) {
   if (argv.includes('--where')) return printWhere();
   if (argv.includes('--init-override')) return initOverride();
 
-  console.log('\n=========== 视频下载器 接口体检 ===========');
+  console.log('\n=========== 微光视频下载器 接口体检 ===========');
   console.log('时间：' + new Date().toLocaleString('zh-CN'));
   if (reportWanted) console.log('模式：体检 + 生成问题报告');
 

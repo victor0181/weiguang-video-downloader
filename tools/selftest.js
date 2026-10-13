@@ -95,7 +95,7 @@ app.whenReady().then(async () => {
   }, TIMEOUT);
 
   try {
-    console.log('\n============ 视频下载器 端到端自检 ============\n');
+    console.log('\n============ 微光视频下载器 端到端自检 ============\n');
 
     // ---------- 1. 准备环境 ----------
     console.log('[1] 启动 aria2');
