@@ -1,0 +1,20 @@
+node_modules/
+run.log
+shot.log
+tools/_selftest_out/
+tools/_dy_out/
+tools/_dyprof/
+tools/_bilitest_prof/
+_tmpud/
+docs/*.tmp
+tools/out/
+接口体检报告-*.md
+dist/
+
+# 第三方二进制：体积大，不随仓库分发（下载方式见 README「快速开始」）
+bin/*.exe
+bin/*.dll
+
+# 运行日志与工作区数据
+logs/
+.workbuddy/

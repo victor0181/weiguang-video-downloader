@@ -1,0 +1,461 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; script-src 'self'; connect-src 'self' data:;" />
+<title>视频下载器</title>
+<link rel="stylesheet" href="./css/app.css" />
+</head>
+<body>
+
+<!-- ======================= 标题栏 ======================= -->
+<header class="titlebar">
+  <div class="tb-brand">
+    <!-- 字形与 assets/logo.ico 同款（tools/make-icon.js），改一处要同步另一处 -->
+    <span class="tb-logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 4.4V14.1" />
+        <path d="M7.5 9.7 12 14.2 16.5 9.7" />
+        <path d="M5.1 16.2V17.5A3.1 3.1 0 0 0 8.2 20.6H15.8A3.1 3.1 0 0 0 18.9 17.5V16.2" stroke-width="2.5" />
+      </svg>
+    </span>
+    <span class="tb-name">视频下载器</span>
+  </div>
+  <div class="tb-drag"></div>
+  <div class="tb-actions">
+    <button class="tb-btn" id="btnMin" title="最小化">
+      <svg viewBox="0 0 12 12"><path d="M2 6h8" /></svg>
+    </button>
+    <button class="tb-btn" id="btnMax" title="最大化/还原">
+      <svg viewBox="0 0 12 12"><rect x="2.5" y="2.5" width="7" height="7" rx="1" /></svg>
+    </button>
+    <button class="tb-btn tb-close" id="btnClose" title="关闭">
+      <svg viewBox="0 0 12 12"><path d="M3 3l6 6M9 3l-6 6" /></svg>
+    </button>
+  </div>
+</header>
+
+<!-- ======================= 接口变更预警条（默认隐藏） ======================= -->
+<div id="healthBanner" class="health-banner hidden">
+  <div class="hb-row">
+    <svg class="hb-ico" viewBox="0 0 24 24"><path d="M12 9v4m0 4h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg>
+    <div class="hb-text">
+      <strong>B站接口可能已变更</strong>
+      <span class="hb-sub js-health-detail"></span>
+    </div>
+    <button class="hb-btn" id="healthRecheck">重新检测</button>
+    <button class="hb-btn" id="healthCopy">复制诊断信息</button>
+    <button class="hb-btn" id="healthGuide">查看修复指引</button>
+    <button class="hb-close" id="healthClose" title="关闭提示">✕</button>
+  </div>
+  <div class="hb-guide hidden" id="healthGuideBody">
+    <div class="hb-detail-list" id="healthGuideDetail"></div>
+    <p>① 在本程序目录打开命令行，运行 <b>node tools/api-test.js</b> —— 它会逐项打勾，失败项直接写明「该改哪个文件的哪个键」。</p>
+    <p>② 想不改代码就换接口：运行 <b>node tools/api-test.js --init-override</b> 生成配置文件，改完重启程序即可生效。</p>
+    <p>③ 若体检显示全部通过，说明只是临时故障，忽略本提示即可。</p>
+    <p class="hb-logpath" id="healthLogPath"></p>
+  </div>
+</div>
+
+<div class="layout">
+  <!-- ======================= 侧栏 ======================= -->
+  <aside class="sidebar">
+    <nav class="nav">
+      <button class="nav-item active" data-tab="home">
+        <svg viewBox="0 0 24 24"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
+        <span>解析下载</span>
+      </button>
+      <button class="nav-item" data-tab="queue">
+        <svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10"/></svg>
+        <span>下载队列</span>
+        <em class="badge" id="queueBadge">0</em>
+      </button>
+      <button class="nav-item" data-tab="history">
+        <svg viewBox="0 0 24 24"><path d="M12 8v5l3 2M21 12a9 9 0 11-3-6.7M21 4v5h-5"/></svg>
+        <span>下载记录</span>
+      </button>
+      <button class="nav-item" data-tab="tools">
+        <svg viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 105.4 5.4L21 21l-3 1-8.4-8.4a4 4 0 01-5.4-5.4l2.8 2.8 2.8-2.8-2.8-2.8 2.2-1z"/></svg>
+        <span>工具箱</span>
+      </button>
+      <button class="nav-item" data-tab="settings">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-2.9 1.2 2 2 0 11-4 0 1.7 1.7 0 00-2.9-1.2l-.1.1a2 2 0 11-2.8-2.8l.1-.1A1.7 1.7 0 003 15a2 2 0 010-4 1.7 1.7 0 001.2-2.9l-.1-.1a2 2 0 112.8-2.8l.1.1A1.7 1.7 0 009 4.6a2 2 0 014 0 1.7 1.7 0 002.9 1.2l.1-.1a2 2 0 112.8 2.8l-.1.1A1.7 1.7 0 0021 11a2 2 0 010 4z"/></svg>
+        <span>设置</span>
+      </button>
+      <button class="nav-item" data-tab="about">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 16v-5M12 8h.01"/></svg>
+        <span>关于</span>
+      </button>
+    </nav>
+
+    <div class="side-foot">
+      <div class="user-card" id="userCard">
+        <div class="avatar" id="userAvatar">未</div>
+        <div class="user-meta">
+          <div class="user-name" id="userName">未登录</div>
+          <div class="user-sub" id="userSub">点击扫码登录</div>
+        </div>
+      </div>
+      <div class="aria-line">
+        <span class="dot" id="ariaDot"></span>
+        <span id="ariaText">下载进程检测中…</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ======================= 内容区 ======================= -->
+  <main class="content">
+
+    <!-- ---------- 解析下载 ---------- -->
+    <section class="tab-panel active" id="tab-home">
+      <div class="panel-head">
+        <h1>解析下载</h1>
+        <p>粘贴 B站视频链接、BV/AV 号、合集链接，或抖音分享链接 / 分享文案；支持单视频、分P 与合集。也可直接拖入文本。</p>
+      </div>
+
+      <div class="parse-bar">
+        <div class="input-wrap">
+          <svg viewBox="0 0 24 24" class="input-icon"><path d="M10 13a5 5 0 007 0l3-3a5 5 0 00-7-7l-1 1M14 11a5 5 0 00-7 0l-3 3a5 5 0 007 7l1-1"/></svg>
+          <input id="parseInput" type="text" placeholder="B站：视频链接 / BV 号 / 合集链接　抖音：https://v.douyin.com/xxxxxx/" />
+          <button class="icon-btn" id="btnClip" title="从剪切板粘贴">
+            <svg viewBox="0 0 24 24"><rect x="8" y="3" width="8" height="4" rx="1"/><path d="M16 5h2a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V7a2 2 0 012-2h2"/></svg>
+          </button>
+          <button class="icon-btn input-clear hidden" id="btnClearInput" title="清空输入框">
+            <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+          </button>
+        </div>
+        <button class="btn btn-primary" id="btnParse">解析</button>
+      </div>
+
+      <div id="parseStatus" class="parse-status hidden"></div>
+
+      <!-- 解析结果 -->
+      <div id="mediaBox" class="media-box hidden">
+        <div class="media-top">
+          <div class="media-cover">
+            <img id="mediaCover" alt="cover" />
+            <span class="media-badge" id="mediaType">单视频</span>
+          </div>
+          <div class="media-info">
+            <h2 id="mediaTitle">—</h2>
+            <div class="media-meta">
+              <span id="mediaUp">—</span>
+              <span class="sep"></span>
+              <span id="mediaDuration">—</span>
+              <span class="sep"></span>
+              <span id="mediaPub">—</span>
+            </div>
+            <div class="media-desc" id="mediaDesc"></div>
+            <div class="media-stat" id="mediaStat"></div>
+          </div>
+        </div>
+
+        <!-- 分P / 合集 选择 -->
+        <div id="partsBox" class="parts-box hidden">
+          <div class="parts-head">
+            <label class="chk"><input type="checkbox" id="chkAll" checked /><span>全选</span></label>
+            <span class="parts-count" id="partsCount"></span>
+            <div class="parts-tools">
+              <button class="btn btn-mini" data-range="all">全部</button>
+              <button class="btn btn-mini" data-range="none">清空</button>
+              <button class="btn btn-mini" data-range="odd">奇数</button>
+              <button class="btn btn-mini" data-range="even">偶数</button>
+            </div>
+          </div>
+          <div class="parts-list" id="partsList"></div>
+        </div>
+
+        <!-- 画质 / 音质（音质仅 B站 有；抖音是单文件 MP4，音轨已包含在视频里） -->
+        <div class="stream-box">
+          <div class="stream-row" id="videoRow">
+            <label>画质</label>
+            <div class="chips" id="videoChips"></div>
+          </div>
+          <div class="stream-row" id="audioRow">
+            <label>音质</label>
+            <div class="chips" id="audioChips"></div>
+          </div>
+          <div class="stream-tip" id="streamTip"></div>
+        </div>
+
+        <div class="media-actions">
+          <button class="btn btn-primary btn-lg" id="btnDownload">开始下载 <em id="dlCount"></em></button>
+          <div class="audio-act">
+            <button class="btn btn-audio btn-lg" id="btnDownloadAudio">
+              <svg viewBox="0 0 24 24"><path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/></svg>
+              只下载音频 <em id="audioCount"></em>
+            </button>
+            <select id="audioFmt" title="音频输出格式：M4A 直接提取音轨（无损）；MP3 源音轨非 MP3 时需转码，会慢一点">
+              <option value="m4a">M4A 无损</option>
+              <option value="mp3">MP3 通用（可能需转码）</option>
+            </select>
+          </div>
+          <button class="btn btn-ghost" id="btnReset">重新输入</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------- 下载队列 ---------- -->
+    <section class="tab-panel" id="tab-queue">
+      <div class="panel-head row">
+        <div>
+          <h1>下载队列</h1>
+          <p>并发数可在「设置」中调整；支持暂停、续传与取消。</p>
+        </div>
+        <div class="head-actions">
+          <button class="btn btn-mini" id="btnPauseAll">全部暂停</button>
+          <button class="btn btn-mini" id="btnResumeAll">全部继续</button>
+          <button class="btn btn-mini" id="btnClearDone">清空已完成</button>
+        </div>
+      </div>
+      <div id="queueList" class="queue-list"></div>
+      <div id="queueEmpty" class="empty">
+        <svg viewBox="0 0 24 24"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
+        <p>队列为空，去「解析下载」添加任务吧</p>
+      </div>
+    </section>
+
+    <!-- ---------- 下载记录 ---------- -->
+    <section class="tab-panel" id="tab-history">
+      <div class="panel-head row">
+        <div>
+          <h1>下载记录</h1>
+          <p>保留最近 2000 条下载历史。</p>
+        </div>
+        <div class="head-actions">
+          <button class="btn btn-mini" id="btnExportHis">导出 JSON</button>
+          <button class="btn btn-mini btn-danger" id="btnClearHis">清空记录</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table class="tbl">
+          <thead>
+            <tr><th>标题</th><th>UP主</th><th>画质</th><th>大小</th><th>时间</th><th>操作</th></tr>
+          </thead>
+          <tbody id="historyBody"></tbody>
+        </table>
+      </div>
+      <div id="historyEmpty" class="empty"><p>暂无下载记录</p></div>
+    </section>
+
+    <!-- ---------- 工具箱 ---------- -->
+    <section class="tab-panel" id="tab-tools">
+      <div class="panel-head">
+        <h1>工具箱</h1>
+        <p>音视频单独下载后的后期处理：AAC 转 MP3、音视频手动混流。</p>
+      </div>
+
+      <div class="tool-card">
+        <h3>AAC → MP3</h3>
+        <p class="tool-desc">把下载到的 .m4s / .aac 音频转成通用性更好的 MP3。</p>
+        <div class="file-row">
+          <input type="text" id="mp3Input" readonly placeholder="选择音频文件…" />
+          <button class="btn btn-mini" id="btnPickMp3">选择文件</button>
+          <button class="btn btn-primary btn-mini" id="btnRunMp3">开始转换</button>
+        </div>
+        <div class="progress thin hidden" id="mp3ProgressWrap"><div class="progress-bar" id="mp3ProgressBar"></div></div>
+      </div>
+
+      <div class="tool-card">
+        <h3>手动混流</h3>
+        <p class="tool-desc">当视频与音频分开下载时，用 ffmpeg 无损封装成一个 MP4。</p>
+        <div class="file-row">
+          <input type="text" id="mixVideo" readonly placeholder="视频文件 (-video.m4s / .mp4)" />
+          <button class="btn btn-mini" id="btnPickV">选择</button>
+        </div>
+        <div class="file-row">
+          <input type="text" id="mixAudio" readonly placeholder="音频文件 (-audio.m4s / .m4a)" />
+          <button class="btn btn-mini" id="btnPickA">选择</button>
+        </div>
+        <div class="file-row">
+          <input type="text" id="mixOut" readonly placeholder="输出文件夹" />
+          <button class="btn btn-mini" id="btnPickO">选择</button>
+          <button class="btn btn-primary btn-mini" id="btnRunMix">开始混流</button>
+        </div>
+        <div class="progress thin hidden" id="mixProgressWrap"><div class="progress-bar" id="mixProgressBar"></div></div>
+      </div>
+    </section>
+
+    <!-- ---------- 设置 ---------- -->
+    <section class="tab-panel" id="tab-settings">
+      <div class="panel-head">
+        <h1>设置</h1>
+        <p>所有修改即时保存。</p>
+      </div>
+
+      <div class="set-group">
+        <h3>下载</h3>
+        <div class="set-row">
+          <label>下载目录</label>
+          <div class="set-ctrl">
+            <input type="text" id="setSavePath" readonly />
+            <button class="btn btn-mini" id="btnSetSavePath">更换</button>
+            <button class="btn btn-mini" id="btnOpenSavePath">打开</button>
+          </div>
+        </div>
+        <div class="set-row">
+          <label>下载并发数</label>
+          <div class="set-ctrl">
+            <input type="range" id="setConcurrency" min="1" max="10" step="1" />
+            <span class="val" id="valConcurrency">3</span>
+          </div>
+        </div>
+        <div class="set-row">
+          <label>默认画质</label>
+          <div class="set-ctrl"><select id="setVideoQn"></select></div>
+        </div>
+        <div class="set-row">
+          <label>默认音质</label>
+          <div class="set-ctrl"><select id="setAudioQn"></select></div>
+        </div>
+        <div class="set-row">
+          <label>「只下载音频」格式</label>
+          <div class="set-ctrl">
+            <select id="setAudioFormat">
+              <option value="m4a">M4A（直接提取音轨，无损、体积小）</option>
+              <option value="mp3">MP3（通用性最好；源音轨非 MP3 时需转码，稍慢）</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="set-group">
+        <h3>命名规则</h3>
+        <div class="set-row col">
+          <label>文件名规则</label>
+          <input type="text" id="setFileRule" />
+          <div class="vars" id="fileVars"></div>
+        </div>
+        <div class="set-row col">
+          <label>文件夹规则（留空则不建文件夹）</label>
+          <input type="text" id="setFolderRule" placeholder="例如：{up}/{title}" />
+          <div class="vars" id="folderVars"></div>
+        </div>
+        <div class="set-row">
+          <label>文件夹名前添加序号</label>
+          <div class="set-ctrl"><label class="switch"><input type="checkbox" id="setAddIndex" /><i></i></label></div>
+        </div>
+      </div>
+
+      <div class="set-group">
+        <h3>附加内容</h3>
+        <div class="set-grid">
+          <label class="switch-row"><span>保存封面</span><label class="switch"><input type="checkbox" id="setCover" /><i></i></label></label>
+          <label class="switch-row"><span>保存弹幕 XML</span><label class="switch"><input type="checkbox" id="setDanmaku" /><i></i></label></label>
+          <label class="switch-row"><span>保存弹幕 ASS</span><label class="switch"><input type="checkbox" id="setAss" /><i></i></label></label>
+          <label class="switch-row"><span>保存字幕 SRT</span><label class="switch"><input type="checkbox" id="setSubtitle" /><i></i></label></label>
+          <label class="switch-row"><span>保存 NFO 刮削</span><label class="switch"><input type="checkbox" id="setNfo" /><i></i></label></label>
+          <label class="switch-row"><span>保留视频分片</span><label class="switch"><input type="checkbox" id="setKeepV" /><i></i></label></label>
+          <label class="switch-row"><span>保留音频分片</span><label class="switch"><input type="checkbox" id="setKeepA" /><i></i></label></label>
+        </div>
+      </div>
+
+      <div class="set-group">
+        <h3>行为</h3>
+        <div class="set-grid">
+          <label class="switch-row"><span>下载完成后自动关机</span><label class="switch"><input type="checkbox" id="setAutoShutdown" /><i></i></label></label>
+          <label class="switch-row"><span>监听剪切板链接</span><label class="switch"><input type="checkbox" id="setClipWatch" /><i></i></label></label>
+          <label class="switch-row"><span>关闭时最小化到托盘</span><label class="switch"><input type="checkbox" id="setMinTray" /><i></i></label></label>
+        </div>
+      </div>
+
+      <div class="set-group">
+        <h3>下载进程</h3>
+        <div class="set-row">
+          <label>aria2 状态</label>
+          <div class="set-ctrl">
+            <span id="setAriaInfo">检测中…</span>
+            <button class="btn btn-mini" id="btnRestartAria">重启下载进程</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="set-group">
+        <h3>恢复默认</h3>
+        <p class="tool-desc">把上面的选项全部恢复为出厂默认值（含下载目录）。<b>下载记录、下载中的任务和登录状态不受影响。</b></p>
+        <div class="set-row">
+          <div class="set-ctrl">
+            <button class="btn btn-danger" id="btnResetSettings">恢复默认设置</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------- 关于 ---------- -->
+    <section class="tab-panel" id="tab-about">
+      <div class="panel-head">
+        <h1>关于</h1>
+        <p>B站 / 抖音 视频下载 · 仅供学习交流使用</p>
+      </div>
+      <div class="about-card">
+        <div class="about-logo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 4.4V14.1" />
+            <path d="M7.5 9.7 12 14.2 16.5 9.7" />
+            <path d="M5.1 16.2V17.5A3.1 3.1 0 0 0 8.2 20.6H15.8A3.1 3.1 0 0 0 18.9 17.5V16.2" stroke-width="2.5" />
+          </svg>
+        </div>
+        <h2>视频下载器</h2>
+        <p class="about-ver" id="aboutVer">v1.1.0</p>
+        <p class="about-desc">
+          一款同时支持 <b>B站</b> 与 <b>抖音</b> 的视频下载工具。粘贴链接即可解析，支持单视频 / 分P / 合集，
+          可选画质与音质，下载后自动混流为 MP4，并可一并保存封面、弹幕、字幕与刮削信息。
+        </p>
+        <div class="about-lines" id="aboutEnv"></div>
+        <div class="about-thanks">
+          <p class="about-thanks-title"><b>致谢</b></p>
+          <p>本项目的设计思路与交互参考了 B站 UP主 <b>王子周棋洛</b> 的开源作品 <b>Bilidown</b>，在此向原作者致以诚挚的感谢。</p>
+          <p class="about-author">本软件由 <b>微光照前行</b> 开发与维护。</p>
+        </div>
+        <div class="about-note">
+          <p><b>声明</b></p>
+          <p>1. 本软件仅解析 B站、抖音 上公开发布的视频，不提供任何资源上传与存储服务。</p>
+          <p>2. 解析所得内容版权归原作者所有，请勿用于商业用途，仅供个人学习交流。</p>
+          <p>3. 本软件免费且不含任何广告，禁止以任何形式付费分发。</p>
+          <p>4. 本项目为个人学习与技术研究作品，与 B站、抖音 官方及原版 Bilidown 作者均无任何关联。</p>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- ======================= 登录弹窗 ======================= -->
+<div class="modal hidden" id="modalLogin">
+  <div class="modal-mask" data-close="1"></div>
+  <div class="modal-body small">
+    <div class="modal-head">
+      <h3>扫码登录</h3>
+      <button class="icon-btn" data-close="1">
+        <svg viewBox="0 0 12 12"><path d="M3 3l6 6M9 3l-6 6"/></svg>
+      </button>
+    </div>
+    <div class="qr-wrap">
+      <img id="qrImg" alt="二维码" />
+      <div class="qr-mask hidden" id="qrMask"><span id="qrMaskText">二维码已过期</span><button class="btn btn-mini" id="btnQrRefresh">刷新</button></div>
+    </div>
+    <p class="qr-tip" id="qrTip">请使用 B站客户端扫码</p>
+  </div>
+</div>
+
+<!-- ======================= 关机倒计时 ======================= -->
+<div class="modal hidden" id="modalShutdown">
+  <div class="modal-mask"></div>
+  <div class="modal-body small">
+    <div class="modal-head"><h3>自动关机</h3></div>
+    <p class="sd-text">全部下载任务已完成，系统将在 <b id="sdSec">30</b> 秒后关机。</p>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" id="btnSdCancel">取消关机</button>
+    </div>
+  </div>
+</div>
+
+<div id="toasts" class="toasts"></div>
+
+<!-- 右键菜单（渲染进程自绘，样式随主题） -->
+<div id="ctxMenu" class="ctx-menu hidden"></div>
+
+<script src="./js/app.js"></script>
+</body>
+</html>

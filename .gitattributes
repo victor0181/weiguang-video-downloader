@@ -1,0 +1,6 @@
+# 统一换行符策略，避免不同机器 checkout 后换行符漂移
+* text=auto eol=lf
+
+# Windows 批处理必须 CRLF —— cmd 按字节解析，LF 会导致整行错位/脚本静默退出
+*.bat text eol=crlf
+*.cmd text eol=crlf

@@ -1,0 +1,19 @@
+{
+  "name": "video-downloader",
+  "version": "1.1.2",
+  "private": true,
+  "description": "视频下载器 —— 同时支持 B站 与 抖音 的视频下载工具（Electron + 原生前端，零构建链）",
+  "author": "Rewritten",
+  "license": "MIT",
+  "main": "src/main/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev"
+  },
+  "dependencies": {
+    "qrcode": "^1.5.4"
+  },
+  "devDependencies": {
+    "electron": "^44.7.0"
+  }
+}
