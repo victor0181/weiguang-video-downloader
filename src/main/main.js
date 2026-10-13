@@ -194,7 +194,11 @@ function migrateDataDir(oldDir, newDir) {
     if (fs.readdirSync(oldDir).length === 0) fs.rmdirSync(oldDir);
   } catch (e) { /* 被占用就留着 */ }
 
-  console.log('[app] migrated ' + moved + ' item(s): ' + oldDir + ' -> ' + newDir);
+  // ★ 只在真搬了东西时记日志：新目录首次建立时 %APPDATA% 里那个空壳也会被扫到，
+  //   那时「migrated 0 item(s)」会让人误以为发生过迁移，白白误导排查。
+  if (moved > 0) {
+    console.log('[app] migrated ' + moved + ' item(s): ' + oldDir + ' -> ' + newDir);
+  }
 }
 
 /** 手写递归复制。**不用 fs.cpSync**：在某些沙箱环境里它会静默杀掉进程（无异常、exit 127）。 */
